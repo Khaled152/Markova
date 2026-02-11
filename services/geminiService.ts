@@ -15,6 +15,7 @@ export const generateCampaignContent = async (
   visualPrefs: CampaignVisualPrefs,
   productImages: string[] = []
 ) => {
+  // Use process.env.API_KEY directly
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = 'gemini-3-pro-preview';
 
@@ -34,9 +35,7 @@ export const generateCampaignContent = async (
     });
   }
 
-  // Mandatory logic for the text overlay
   const hasCustomText = visualPrefs.customText && visualPrefs.customText.trim().length > 0;
-  
   const textInstruction = hasCustomText
     ? `STRICT REQUIREMENT: You MUST include the exact text "${visualPrefs.customText?.trim()}" in the design_notes for EVERY post. Explicitly state: 'Render the text "${visualPrefs.customText?.trim()}" in a bold, clean commercial font as a graphic overlay.'`
     : `STRICT REQUIREMENT: Do NOT include ANY text, letters, slogans, or characters in the design_notes. The scene must be PURELY visual and clean of any typography.`;
@@ -109,6 +108,7 @@ export const generatePostImage = async (
   brand?: BrandKit,
   productImages: string | string[] = []
 ) => {
+  // Use process.env.API_KEY directly
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = 'gemini-2.5-flash-image';
   
@@ -130,11 +130,8 @@ export const generatePostImage = async (
     });
   }
 
-  // Refined Logic for Text Exclusion
   const hasTextInPrompt = prompt.includes('"');
-  
   let instructions = `SCENE: ${prompt}.\n`;
-  
   if (hasTextInPrompt) {
     instructions += `TYPOGRAPHY: Identify the text in quotes and render it exactly and legibly. High-end commercial font only.\n`;
   } else {
@@ -146,7 +143,6 @@ export const generatePostImage = async (
   }
   
   instructions += `TECHNICAL: Professional studio lighting, 8k resolution, cinematic composition.`;
-
   parts.push({ text: instructions });
 
   try {
@@ -177,9 +173,9 @@ export const generateStrategicPlan = async (
   goals: string,
   targetRegion: string
 ) => {
+  // Use process.env.API_KEY directly
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = 'gemini-3-pro-preview';
-
   const prompt = `Task: Create a strategic plan for ${brand.name}. Goals: ${goals}. Region: ${targetRegion}. JSON output.`;
 
   try {

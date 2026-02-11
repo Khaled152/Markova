@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth, useLanguage } from '../App';
 import { GoogleGenAI, VideoGenerationReferenceType } from "@google/genai";
-import { Video, Sparkles, Loader2, Download, Play, AlertCircle, Info, Key, Monitor, Smartphone, RefreshCw, Upload, X, Image as ImageIcon, Plus } from 'lucide-react';
+import { Video, Sparkles, Loader2, Download, AlertCircle, Key, Monitor, Smartphone, RefreshCw, X, Plus } from 'lucide-react';
 
 const VideoGeneratorPage: React.FC = () => {
   const { user } = useAuth();
@@ -23,20 +23,28 @@ const VideoGeneratorPage: React.FC = () => {
 
   useEffect(() => {
     const checkKey = async () => {
-      // @ts-ignore
-      const active = await window.aistudio.hasSelectedApiKey();
-      setHasKey(active);
+      const aiStudio = (window as any).aistudio;
+      if (aiStudio && typeof aiStudio.hasSelectedApiKey === 'function') {
+        const active = await aiStudio.hasSelectedApiKey();
+        setHasKey(active);
+      } else {
+        // Fallback check strictly on process.env
+        setHasKey(!!process.env.API_KEY);
+      }
     };
     checkKey();
   }, []);
 
   const handleSelectKey = async () => {
-    // @ts-ignore
-    await window.aistudio.openSelectKey();
-    setHasKey(true); 
+    const aiStudio = (window as any).aistudio;
+    if (aiStudio && typeof aiStudio.openSelectKey === 'function') {
+      await aiStudio.openSelectKey();
+      setHasKey(true); 
+    } else {
+      alert("Billing selection is only available in the official AI Studio environment.");
+    }
   };
 
-  // Fixed: Explicitly typed file as File to ensure it is treated as a Blob for FileReader
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
@@ -63,7 +71,9 @@ const VideoGeneratorPage: React.FC = () => {
     setStatus('Initializing Veo 3.1 Node...');
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Use process.env.API_KEY directly as per guidelines
+      const apiKey = process.env.API_KEY || '';
+      const ai = new GoogleGenAI({ apiKey });
       
       let model = 'veo-3.1-fast-generate-preview';
       let config: any = {
@@ -78,16 +88,13 @@ const VideoGeneratorPage: React.FC = () => {
         config
       };
 
-      // Process images into the payload
       if (images.length === 1) {
-        // Start Frame
         const [mime, data] = images[0].split(',');
         payload.image = {
           imageBytes: data,
           mimeType: mime.match(/:(.*?);/)?.[1] || 'image/png'
         };
       } else if (images.length === 2) {
-        // Start and End Frame
         const [mime1, data1] = images[0].split(',');
         const [mime2, data2] = images[1].split(',');
         payload.image = {
@@ -99,10 +106,8 @@ const VideoGeneratorPage: React.FC = () => {
           mimeType: mime2.match(/:(.*?);/)?.[1] || 'image/png'
         };
       } else if (images.length === 3) {
-        // Reference Assets - Switch to high quality model
         model = 'veo-3.1-generate-preview';
         payload.model = model;
-        // Fix resolution/aspect ratio for multi-reference mode if needed (per docs)
         config.resolution = '720p';
         config.aspectRatio = '16:9';
         setResolution('720p');
@@ -142,7 +147,7 @@ const VideoGeneratorPage: React.FC = () => {
         } catch (e: any) {
           if (e.message?.includes("Requested entity was not found")) {
             setHasKey(false);
-            throw new Error("API Key configuration lost. Please re-select your billing key.");
+            throw new Error("API Key configuration reset required. Please re-select your billing key.");
           }
           throw e;
         }
@@ -152,8 +157,7 @@ const VideoGeneratorPage: React.FC = () => {
       if (!downloadLink) throw new Error("Video generation completed but no link was provided.");
 
       setStatus('Streaming temporal frames...');
-      // Fixed: Cast the fetch response blob to any to avoid potential unknown or shadowing issues with URL.createObjectURL
-      const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+      const response = await fetch(`${downloadLink}&key=${apiKey}`);
       const videoBlob = await response.blob();
       const url = URL.createObjectURL(videoBlob as any);
       setVideoUrl(url);
@@ -193,7 +197,6 @@ const VideoGeneratorPage: React.FC = () => {
         {/* Controls */}
         <div className="bg-white p-10 rounded-[40px] border border-slate-100 shadow-sm space-y-10">
           
-          {/* Multimodal Upload Area */}
           <div className="space-y-4">
              <div className="flex items-center justify-between">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Reference Assets (Up to 3)</label>
@@ -225,18 +228,13 @@ const VideoGeneratorPage: React.FC = () => {
                 )}
              </div>
              <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleImageUpload} />
-             <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-center">
-                {images.length === 1 && "Video will start from this image."}
-                {images.length === 2 && "Video will animate between these two images."}
-                {images.length === 3 && "Switching to Asset-Reference mode (16:9, 720p)."}
-             </p>
           </div>
 
           <div className="space-y-4">
              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Action & Motion Prompt</label>
              <textarea 
                 className="w-full px-8 py-6 bg-slate-50 border border-slate-200 rounded-[32px] outline-none font-bold text-slate-700 focus:ring-4 focus:ring-indigo-100 transition-all min-h-[140px] resize-none"
-                placeholder="Describe the action taking place... e.g., 'The camera zooms in slowly while the liquid in the bottle swirls with cinematic elegance.'"
+                placeholder="Describe the action taking place..."
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
              />
@@ -284,13 +282,6 @@ const VideoGeneratorPage: React.FC = () => {
              </div>
           </div>
 
-          <div className="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100 flex gap-4">
-             <Info className="w-5 h-5 text-indigo-600 shrink-0 mt-1" />
-             <p className="text-[10px] text-indigo-700 leading-relaxed font-bold uppercase tracking-wider">
-                Veo 3.1 processes take 1-3 minutes. Multimodal generation requires substantial temporal synthesis. Please keep this session active during render.
-             </p>
-          </div>
-
           <button 
              disabled={isLoading || (!prompt && images.length === 0) || !hasKey}
              onClick={generateVideo}
@@ -304,10 +295,10 @@ const VideoGeneratorPage: React.FC = () => {
         {/* Output Area */}
         <div className="space-y-6 sticky top-24">
            {error && (
-              <div className="p-6 bg-red-50 border border-red-100 rounded-3xl flex items-center gap-4 text-red-700 animate-in slide-in-from-top-4">
+              <div className="p-6 bg-red-50 border border-red-100 rounded-3xl flex items-center gap-4 text-red-700">
                  <AlertCircle className="w-6 h-6 shrink-0" />
                  <div>
-                    <p className="font-black text-xs uppercase tracking-widest">Infrastructure Error</p>
+                    <p className="font-black text-xs uppercase tracking-widest">Engine Error</p>
                     <p className="text-sm font-medium opacity-80">{error}</p>
                  </div>
               </div>
@@ -315,13 +306,7 @@ const VideoGeneratorPage: React.FC = () => {
 
            <div className={`bg-slate-900 rounded-[48px] overflow-hidden shadow-2xl border border-slate-800 relative group flex items-center justify-center ${aspectRatio === '9:16' ? 'aspect-[9/16] max-h-[700px] mx-auto' : 'aspect-video'}`}>
               {videoUrl ? (
-                <video 
-                  src={videoUrl} 
-                  controls 
-                  autoPlay 
-                  loop 
-                  className="w-full h-full object-cover"
-                />
+                <video src={videoUrl} controls autoPlay loop className="w-full h-full object-cover" />
               ) : (
                 <div className="flex flex-col items-center gap-6 text-slate-700">
                    <div className="w-24 h-24 rounded-full bg-slate-800/50 flex items-center justify-center">
@@ -333,49 +318,11 @@ const VideoGeneratorPage: React.FC = () => {
 
               {isLoading && (
                  <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-xl flex flex-col items-center justify-center text-indigo-400 p-10 text-center space-y-8">
-                    <div className="w-20 h-20 rounded-full border-4 border-slate-800 border-t-indigo-500 animate-spin"></div>
-                    <div className="space-y-2">
-                       <h3 className="font-black text-xl text-white uppercase tracking-tight">{status}</h3>
-                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Synthesizing Temporal Frames...</p>
-                    </div>
-                    <div className="flex gap-2">
-                       <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce"></div>
-                       <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce [animation-delay:0.2s]"></div>
-                       <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce [animation-delay:0.4s]"></div>
-                    </div>
-                 </div>
-              )}
-
-              {videoUrl && !isLoading && (
-                 <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <a 
-                      href={videoUrl} 
-                      download="markova-cinematic-ad.mp4"
-                      className="p-4 bg-white/10 backdrop-blur-md rounded-2xl text-white hover:bg-white/20 transition-all flex items-center gap-3 border border-white/20"
-                    >
-                       <Download className="w-5 h-5" />
-                    </a>
+                    <Loader2 className="w-12 h-12 animate-spin" />
+                    <h3 className="font-black text-xl text-white uppercase tracking-tight">{status}</h3>
                  </div>
               )}
            </div>
-
-           {videoUrl && (
-             <div className="flex gap-4">
-                <button 
-                   onClick={() => { setVideoUrl(null); setPrompt(''); setImages([]); }}
-                   className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
-                >
-                   <RefreshCw className="w-4 h-4" /> Reset Workspace
-                </button>
-                <a 
-                  href={videoUrl} 
-                  download="markova-cinematic-ad.mp4"
-                  className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
-                >
-                   <Download className="w-4 h-4" /> Download MP4
-                </a>
-             </div>
-           )}
         </div>
       </div>
     </div>

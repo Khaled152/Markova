@@ -1,11 +1,12 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLanguage } from '../App';
 import { mockDb } from '../services/mockDb';
 import { User, Plan, UserRole, ActivityLog } from '../types';
 import { 
-  ShieldCheck, Users, CreditCard, Activity, Edit3, Lock, Unlock, 
-  MoreVertical, Loader2, Trash2, Plus, X, Check, AlertCircle, Search, 
-  Ban, Settings, Bell, Database, Globe, Filter, Power, Info, Key, ExternalLink, RefreshCw, Cpu, Server, Terminal, Eye, EyeOff
+  ShieldCheck, Users, CreditCard, Activity, 
+  Loader2, Trash2, Plus, X, Check, AlertCircle, Search, 
+  Settings, Bell, Database, Globe, Power, Info, Key, ExternalLink, RefreshCw, Cpu, Server, Terminal
 } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
@@ -17,12 +18,11 @@ const AdminDashboard: React.FC = () => {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Manual API Key state
-  const [manualKey, setManualKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
+  // API Key state purely based on system availability
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
   const [checkingKey, setCheckingKey] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Global Settings state (mock)
   const [settings, setSettings] = useState({
@@ -33,12 +33,25 @@ const AdminDashboard: React.FC = () => {
 
   const checkApiKeyStatus = async () => {
     setCheckingKey(true);
+    setError(null);
     try {
-      // @ts-ignore - window.aistudio is provided by the platform
-      const active = await window.aistudio.hasSelectedApiKey();
-      setHasApiKey(active);
+      // First check if it's already in the process environment (server-side/injected)
+      if (process.env.API_KEY && process.env.API_KEY.length > 5) {
+        setHasApiKey(true);
+        return;
+      }
+
+      // Then check for platform-specific selection tool
+      const aiStudio = (window as any).aistudio;
+      if (aiStudio && typeof aiStudio.hasSelectedApiKey === 'function') {
+        const active = await aiStudio.hasSelectedApiKey();
+        setHasApiKey(active);
+      } else {
+        setHasApiKey(false);
+      }
     } catch (e) {
       console.error("API Key Check Failed", e);
+      setHasApiKey(false);
     } finally {
       setCheckingKey(false);
     }
@@ -46,21 +59,20 @@ const AdminDashboard: React.FC = () => {
 
   const handleConnect = async () => {
     setIsConnecting(true);
+    setError(null);
     try {
-      // Simulate validation of the manual key if provided
-      if (manualKey.length > 0 && manualKey.length < 20) {
-         throw new Error("Invalid Key Format: Key too short.");
+      const aiStudio = (window as any).aistudio;
+      if (aiStudio && typeof aiStudio.openSelectKey === 'function') {
+        await aiStudio.openSelectKey();
+        // The key selection might take a moment to reflect, but we proceed
+        setHasApiKey(true);
+        alert("Success: AI Gateway linked via secure platform selector.");
+      } else {
+        // In a standalone server environment, explain why manual input isn't here
+        setError("Secure Key Selector Unavailable. In production environments, please ensure your API_KEY is set in your server's environment variables (process.env.API_KEY).");
       }
-      
-      // Call the platform's secure key selector to link the identity
-      // @ts-ignore - window.aistudio is provided by the platform
-      await window.aistudio.openSelectKey();
-      
-      // Assumptions: Proceeding after trigger per SDK rules
-      await checkApiKeyStatus();
-      setManualKey(''); // Clear after connection
     } catch (e: any) {
-      alert(e.message || "Failed to establish AI Gateway connection.");
+      setError(e.message || "An unexpected error occurred during gateway activation.");
     } finally {
       setIsConnecting(false);
     }
@@ -164,7 +176,7 @@ const AdminDashboard: React.FC = () => {
       {/* Infrastructure & API Tab */}
       {activeTab === 'system' && (
         <div className="grid lg:grid-cols-2 gap-10">
-           {/* Gemini API Credentials Card */}
+           {/* Gemini AI Gateway Status Card */}
            <div className="bg-white rounded-[48px] p-12 border border-slate-100 shadow-sm space-y-10 flex flex-col">
               <div className="flex items-center justify-between mb-2">
                  <div className="flex items-center gap-4">
@@ -177,52 +189,42 @@ const AdminDashboard: React.FC = () => {
                     <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
                  ) : (
                     <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${hasApiKey ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                       {hasApiKey ? 'Encrypted Connection' : 'Disconnected'}
+                       {hasApiKey ? 'Active Connection' : 'Disconnected'}
                     </div>
                  )}
               </div>
 
-              <div className="space-y-8">
-                 {/* Manual Key Input Field */}
-                 <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Manual API Configuration</label>
-                    <div className="relative group">
-                       <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300">
-                          <Lock className="w-5 h-5" />
-                       </div>
-                       <input 
-                         type={showKey ? 'text' : 'password'}
-                         className="w-full pl-16 pr-16 py-6 bg-slate-50 border border-slate-200 rounded-[32px] outline-none font-bold text-slate-700 focus:ring-4 focus:ring-markova/5 transition-all"
-                         placeholder="Enter Gemini API Key..."
-                         value={manualKey}
-                         onChange={e => setManualKey(e.target.value)}
-                       />
-                       <button 
-                         onClick={() => setShowKey(!showKey)}
-                         className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-400 hover:text-markova transition-colors"
-                       >
-                          {showKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                       </button>
-                    </div>
-                 </div>
+              {error && (
+                <div className="p-6 bg-red-50 border border-red-100 rounded-[24px] flex flex-col gap-2 text-red-700 text-xs animate-in shake duration-300">
+                  <div className="flex items-center gap-2 font-black uppercase tracking-widest">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    Engine Activation Failed
+                  </div>
+                  <p className="font-medium opacity-80 leading-relaxed">{error}</p>
+                </div>
+              )}
 
+              <div className="space-y-8">
                  <div className="bg-slate-900 p-8 rounded-[32px] border border-slate-800 space-y-4 font-mono">
                     <div className="flex items-center gap-2">
                        <Terminal className="w-4 h-4 text-indigo-400" />
-                       <span className="text-[10px] text-slate-400 font-bold uppercase">Env Status Monitor</span>
+                       <span className="text-[10px] text-slate-400 font-bold uppercase">Infrastructure Monitor</span>
                     </div>
                     <div className="space-y-2">
-                       <p className="text-xs text-slate-300"><span className="text-indigo-400">ENGINE:</span> Veo & Gemini 3 Pro</p>
-                       <p className="text-xs text-slate-300"><span className="text-indigo-400">STATUS:</span> {hasApiKey ? 'RESOLVED' : 'UNINITIALIZED'}</p>
-                       <p className="text-xs text-slate-300"><span className="text-indigo-400">ENCRYPTION:</span> AES_GCM_256</p>
+                       <p className="text-xs text-slate-300"><span className="text-indigo-400">ENGINE:</span> Gemini 3.0 Pro & Veo 3.1</p>
+                       <p className="text-xs text-slate-300"><span className="text-indigo-400">STATUS:</span> {hasApiKey ? 'AUTHENTICATED' : 'UNAUTHORIZED'}</p>
+                       <p className="text-xs text-slate-300"><span className="text-indigo-400">ENV_VAR:</span> {process.env.API_KEY ? 'INJECTED_SYSTEM' : 'PENDING_INPUT'}</p>
                     </div>
                  </div>
 
                  <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex gap-4">
                     <Info className="w-5 h-5 text-indigo-600 shrink-0 mt-1" />
-                    <p className="text-[10px] text-slate-600 font-bold uppercase tracking-wider leading-relaxed">
-                       Pasting a key above verifies your project's identity. Clicking "Activate" below creates the secure link with Google Cloud.
-                    </p>
+                    <div>
+                      <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest mb-1">Configuration Note</p>
+                      <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                        To maintain production-grade security, manual text input for keys is disabled. Keys must be set via your server's <code className="bg-slate-200 px-1 rounded">API_KEY</code> environment variable or the secure platform dialog.
+                      </p>
+                    </div>
                  </div>
               </div>
 
@@ -230,14 +232,14 @@ const AdminDashboard: React.FC = () => {
                  <button 
                    onClick={handleConnect}
                    disabled={isConnecting}
-                   className="w-full bg-markova text-white py-6 rounded-[32px] font-black text-lg uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 flex items-center justify-center gap-3 disabled:bg-slate-200"
+                   className="w-full bg-markova text-white py-6 rounded-[32px] font-black text-lg uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 flex items-center justify-center gap-3 disabled:bg-slate-200 disabled:text-slate-400"
                  >
                     {isConnecting ? (
                        <Loader2 className="w-6 h-6 animate-spin" />
                     ) : (
-                       <RefreshCw className="w-5 h-5" />
+                       <Power className="w-5 h-5" />
                     )}
-                    {hasApiKey ? 'Reconnect AI Engine' : 'Activate AI Gateway'}
+                    {hasApiKey ? 'Refresh AI Engine' : 'Activate AI Gateway'}
                  </button>
                  <a 
                    href="https://ai.google.dev/gemini-api/docs/billing" 
@@ -245,7 +247,7 @@ const AdminDashboard: React.FC = () => {
                    rel="noopener noreferrer"
                    className="flex items-center justify-center gap-2 text-[10px] font-black text-slate-400 hover:text-markova uppercase tracking-[0.2em] transition-all"
                  >
-                    Billing Documentation <ExternalLink className="w-3 h-3" />
+                    Official Billing Documentation <ExternalLink className="w-3 h-3" />
                  </a>
               </div>
            </div>
@@ -302,8 +304,7 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Other tabs remain unchanged or can be implemented similarly */}
-      {activeTab === 'users' && <div className="p-20 text-center text-slate-400 font-black uppercase tracking-widest text-xs">Identity Registry Loaded</div>}
+      {activeTab === 'users' && <div className="p-20 text-center text-slate-400 font-black uppercase tracking-widest text-xs">Identity Registry Synchronized</div>}
       {activeTab === 'plans' && <div className="p-20 text-center text-slate-400 font-black uppercase tracking-widest text-xs">Tier Architect Loaded</div>}
     </div>
   );

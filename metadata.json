@@ -1,0 +1,8 @@
+{
+  "name": "Markova AI",
+  "description": "The ultimate AI-powered marketing agency. Generate full social media campaigns, strategic plans, and brand-perfect visuals with Markova.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import { User, UserRole, LanguageContextType } from './types';
@@ -17,7 +16,7 @@ import ImageGeneratorPage from './pages/ImageGeneratorPage';
 import SinglePostPage from './pages/SinglePostPage';
 import AdminDashboard from './pages/AdminDashboard';
 import Login from './pages/Login';
-import { LogOut, User as UserIcon, Settings, LayoutDashboard, Sparkles, FolderHeart, ShieldCheck, Globe, ImageIcon, Loader2, Compass } from 'lucide-react';
+import { LogOut, User as UserIcon, Settings, LayoutDashboard, Sparkles, FolderHeart, ShieldCheck, Globe, ImageIcon, Loader2, Compass, AlertCircle } from 'lucide-react';
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
@@ -38,6 +37,29 @@ export const useAuth = () => {
   if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
 };
+
+// Global Error Boundary to prevent total White Screens
+// Fix: Added explicit typing for React.Component and made children optional to satisfy JSX prop requirements
+class ErrorBoundary extends React.Component<{ children?: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: { children?: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-screen flex flex-col items-center justify-center p-10 bg-slate-50 text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
+          <h1 className="text-2xl font-black text-slate-900 mb-2 uppercase">Application Error</h1>
+          <p className="text-slate-500 mb-6">A critical system error occurred. Please refresh your browser.</p>
+          <button onClick={() => window.location.reload()} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-bold">Reload Markova</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export const MarkovaLogo: React.FC<{ size?: 'sm' | 'md' | 'lg', showText?: boolean }> = ({ size = 'md', showText = true }) => {
   const iconSize = size === 'sm' ? 'w-6 h-6' : size === 'lg' ? 'w-12 h-12' : 'w-10 h-10';
@@ -68,7 +90,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       console.error("Logout error:", error);
     } finally {
       setUser(null);
-      localStorage.removeItem('supabase.auth.token'); // Fallback manual clear
+      localStorage.removeItem('supabase.auth.token');
       navigate('/login');
     }
   };
@@ -77,7 +99,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50">
         <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mb-4" />
-        <p className="text-slate-500 font-medium">Authenticating...</p>
+        <p className="text-slate-500 font-medium">Authenticating Markova...</p>
       </div>
     );
   }
@@ -230,27 +252,29 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, isLoading }}>
-      <LanguageContext.Provider value={{ language, setLanguage, dir, t }}>
-        <HashRouter>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" />} />
-              <Route path="/brand-kit" element={user ? <BrandKitPage /> : <Navigate to="/login" />} />
-              <Route path="/generator" element={user ? <CampaignGeneratorPage /> : <Navigate to="/login" />} />
-              <Route path="/strategy" element={user ? <StrategicPlanPage /> : <Navigate to="/login" />} />
-              <Route path="/image-gen" element={user ? <ImageGeneratorPage /> : <Navigate to="/login" />} />
-              <Route path="/history" element={user ? <CampaignHistoryPage /> : <Navigate to="/login" />} />
-              <Route path="/campaign/:id" element={user ? <CampaignDetailsPage /> : <Navigate to="/login" />} />
-              <Route path="/post/:campaignId/:postId" element={user ? <SinglePostPage /> : <Navigate to="/login" />} />
-              <Route path="/admin" element={user?.role === UserRole.ADMIN ? <AdminDashboard /> : <Navigate to="/dashboard" />} />
-            </Routes>
-          </Layout>
-        </HashRouter>
-      </LanguageContext.Provider>
-    </AuthContext.Provider>
+    <ErrorBoundary>
+      <AuthContext.Provider value={{ user, setUser, isLoading }}>
+        <LanguageContext.Provider value={{ language, setLanguage, dir, t }}>
+          <HashRouter>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" />} />
+                <Route path="/brand-kit" element={user ? <BrandKitPage /> : <Navigate to="/login" />} />
+                <Route path="/generator" element={user ? <CampaignGeneratorPage /> : <Navigate to="/login" />} />
+                <Route path="/strategy" element={user ? <StrategicPlanPage /> : <Navigate to="/login" />} />
+                <Route path="/image-gen" element={user ? <ImageGeneratorPage /> : <Navigate to="/login" />} />
+                <Route path="/history" element={user ? <CampaignHistoryPage /> : <Navigate to="/login" />} />
+                <Route path="/campaign/:id" element={user ? <CampaignDetailsPage /> : <Navigate to="/login" />} />
+                <Route path="/post/:campaignId/:postId" element={user ? <SinglePostPage /> : <Navigate to="/login" />} />
+                <Route path="/admin" element={user?.role === UserRole.ADMIN ? <AdminDashboard /> : <Navigate to="/dashboard" />} />
+              </Routes>
+            </Layout>
+          </HashRouter>
+        </LanguageContext.Provider>
+      </AuthContext.Provider>
+    </ErrorBoundary>
   );
 };
 

@@ -35,29 +35,27 @@ export const generateCampaignContent = async (
   }
 
   // Mandatory logic for the text overlay
-  const textInstruction = visualPrefs.customText && visualPrefs.customText.trim().length > 0
-    ? `IMPORTANT: You MUST include the instruction 'Render the text "${visualPrefs.customText.trim()}" clearly and legibly as a graphic overlay' in the design_notes for EVERY post.`
-    : `STRICT: Do NOT include any instructions for text or typography in the design_notes. The image should be purely visual with no text.`;
+  const hasCustomText = visualPrefs.customText && visualPrefs.customText.trim().length > 0;
+  
+  const textInstruction = hasCustomText
+    ? `STRICT REQUIREMENT: You MUST include the exact text "${visualPrefs.customText?.trim()}" in the design_notes for EVERY post. Explicitly state: 'Render the text "${visualPrefs.customText?.trim()}" in a bold, clean commercial font as a graphic overlay.'`
+    : `STRICT REQUIREMENT: Do NOT include ANY text, letters, slogans, or characters in the design_notes. The scene must be PURELY visual and clean of any typography.`;
 
   const prompt = `
-    System Role: You are a Senior Creative Director.
-    Task: Plan a 3-post viral social media campaign.
+    System Role: Senior Creative Director.
+    Task: Plan a 3-post social media campaign.
     
     VISUAL STYLE GUIDE:
     - Art Medium: ${visualPrefs.artStyle}
-    - Human Presence: ${visualPrefs.includeCharacter ? 'Include a human character' : 'No humans, product only'}
-    - Lighting/Effect: ${visualPrefs.visualEffect}
-    - Graphics: ${visualPrefs.addedShapes !== 'None' ? `Include ${visualPrefs.addedShapes} shapes` : 'No extra shapes'}
-    - Footer: ${visualPrefs.addFooterShape ? 'Include a solid footer bar for branding' : 'No footer bar'}
+    - Character: ${visualPrefs.includeCharacter ? 'Include a human character' : 'No humans, focus only on the product'}
+    - Effect: ${visualPrefs.visualEffect}
+    - Shapes: ${visualPrefs.addedShapes !== 'None' ? `Incorporate ${visualPrefs.addedShapes} graphics` : 'Clean composition, no extra shapes'}
+    - Branding: ${visualPrefs.addFooterShape ? 'Include a stylized brand footer at the bottom' : 'No footer bar'}
     
     ${textInstruction}
     
     Market: ${targetMarket}
-    Language: ${contentDialect} Arabic & English
-    
-    Requirements:
-    Generate detailed "design_notes" for an image AI. 
-    Ensure the design_notes strictly follow the Style Guide above.
+    Language: ${contentDialect} (Captions in both Arabic & English)
   `;
 
   parts.push({ text: prompt });
@@ -103,7 +101,7 @@ export const generateCampaignContent = async (
 };
 
 /**
- * Generates a high-quality commercial image.
+ * Generates a high-quality commercial image using Gemini 2.5 Flash Image.
  */
 export const generatePostImage = async (
   prompt: string, 
@@ -132,21 +130,22 @@ export const generatePostImage = async (
     });
   }
 
-  // Final prompt tuning for the image model
+  // Refined Logic for Text Exclusion
+  const hasTextInPrompt = prompt.includes('"');
+  
   let instructions = `SCENE: ${prompt}.\n`;
   
-  // High-fidelity text instruction
-  if (prompt.includes('"')) {
-    instructions += `TYPOGRAPHY: Identify the text in quotes within the scene description and render it exactly, legibly, and beautifully in a clean commercial font. Ensure no spelling errors.\n`;
+  if (hasTextInPrompt) {
+    instructions += `TYPOGRAPHY: Identify the text in quotes and render it exactly and legibly. High-end commercial font only.\n`;
   } else {
-    instructions += `STRICT: Do NOT include any text, letters, or numbers in the image unless they are physically part of the product label.\n`;
+    instructions += `STRICT EXCLUSION: Do NOT render any text, characters, letters, or gibberish. No labels, no watermarks, no typography. The image must be purely visual.\n`;
   }
 
   if (brand) {
-    instructions += `COLOR SCHEME: Use ${brand.primary_color} and ${brand.secondary_color} accents.\n`;
+    instructions += `BRANDING: Use ${brand.primary_color} and ${brand.secondary_color} as the primary color accents.\n`;
   }
   
-  instructions += `QUALITY: 8k resolution, professional studio photography, cinematic bokeh, masterpiece.`;
+  instructions += `TECHNICAL: Professional studio lighting, 8k resolution, cinematic composition.`;
 
   parts.push({ text: instructions });
 
@@ -173,9 +172,6 @@ export const generatePostImage = async (
   }
 };
 
-/**
- * Generates a full Marketing Strategic Plan.
- */
 export const generateStrategicPlan = async (
   brand: BrandKit,
   goals: string,
@@ -184,11 +180,7 @@ export const generateStrategicPlan = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = 'gemini-3-pro-preview';
 
-  const prompt = `
-    Task: Create a 12-month Strategic Marketing Plan for "${brand.name}".
-    Context: Goals: ${goals}, Region: ${targetRegion}.
-    Format: JSON.
-  `;
+  const prompt = `Task: Create a strategic plan for ${brand.name}. Goals: ${goals}. Region: ${targetRegion}. JSON output.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -197,64 +189,12 @@ export const generateStrategicPlan = async (
       config: {
         thinkingConfig: { thinkingBudget: 4000 },
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            swot: {
-              type: Type.OBJECT,
-              properties: {
-                strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-                weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
-                opportunities: { type: Type.ARRAY, items: { type: Type.STRING } },
-                threats: { type: Type.ARRAY, items: { type: Type.STRING } },
-              },
-              required: ["strengths", "weaknesses", "opportunities", "threats"],
-            },
-            competitors: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  advantage: { type: Type.STRING },
-                  vulnerability: { type: Type.STRING },
-                },
-                required: ["name", "advantage", "vulnerability"],
-              },
-            },
-            audience_personas: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  pain_points: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  ideal_solution: { type: Type.STRING },
-                },
-                required: ["name", "pain_points", "ideal_solution"],
-              },
-            },
-            roadmap: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  month: { type: Type.STRING },
-                  focus: { type: Type.STRING },
-                  tasks: { type: Type.ARRAY, items: { type: Type.STRING } },
-                },
-                required: ["month", "focus", "tasks"],
-              },
-            },
-          },
-          required: ["swot", "competitors", "audience_personas", "roadmap"],
-        },
       },
     });
 
     return JSON.parse(response.text || '{}');
   } catch (error) {
-    console.error("Gemini Strategic Planning Error:", error);
+    console.error("Gemini Strategy Error:", error);
     throw error;
   }
 };

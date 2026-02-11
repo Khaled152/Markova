@@ -34,15 +34,17 @@ const AdminDashboard: React.FC = () => {
   const checkApiKeyStatus = useCallback(async () => {
     setCheckingKey(true);
     try {
-      // Priority 1: Check system-level environment variable (Standard for Vercel/Self-hosted)
+      // Direct detection of the environment variable you added in Vercel
       const envKey = process.env.API_KEY;
+      
+      // If the key is present (checking length to ensure it's a real key)
       if (envKey && envKey.length > 10) {
         setHasApiKey(true);
         setError(null);
         return;
       }
 
-      // Priority 2: Check for AI Studio platform selection (Standard for preview/iframe)
+      // Fallback: Check for platform-specific selection tool (if running in AI Studio)
       const aiStudio = (window as any).aistudio;
       if (aiStudio && typeof aiStudio.hasSelectedApiKey === 'function') {
         const active = await aiStudio.hasSelectedApiKey();
@@ -62,21 +64,19 @@ const AdminDashboard: React.FC = () => {
     setIsConnecting(true);
     setError(null);
     try {
-      // Re-run the environment check first
       await checkApiKeyStatus();
       
       if (hasApiKey) {
-        alert("System Synchronized: The AI Gateway is active via your server environment variables.");
+        alert("System Synchronized: The AI Gateway is active via your Vercel Environment Variables.");
         return;
       }
 
-      // If still no key, try the selection dialog
       const aiStudio = (window as any).aistudio;
       if (aiStudio && typeof aiStudio.openSelectKey === 'function') {
         await aiStudio.openSelectKey();
         setHasApiKey(true);
       } else {
-        setError("AI Gateway could not be initialized. Please ensure the API_KEY environment variable is correctly set in your project settings and you have redeployed the application.");
+        setError("AI Gateway could not be initialized. Please ensure the API_KEY environment variable is correctly set in your Vercel project settings and you have redeployed the application.");
       }
     } catch (e: any) {
       setError(e.message || "An unexpected error occurred during gateway activation.");
@@ -196,7 +196,7 @@ const AdminDashboard: React.FC = () => {
                     <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
                  ) : (
                     <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${hasApiKey ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                       {hasApiKey ? 'System Ready' : 'Disconnected'}
+                       {hasApiKey ? 'Deployment Active' : 'Disconnected'}
                     </div>
                  )}
               </div>
@@ -205,7 +205,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="p-6 bg-red-50 border border-red-100 rounded-[24px] flex flex-col gap-2 text-red-700 text-xs animate-in shake duration-300">
                   <div className="flex items-center gap-2 font-black uppercase tracking-widest">
                     <AlertCircle className="w-4 h-4 shrink-0" />
-                    Gateway Configuration Required
+                    Infrastructure Error
                   </div>
                   <p className="font-medium opacity-80 leading-relaxed">{error}</p>
                 </div>
@@ -224,8 +224,8 @@ const AdminDashboard: React.FC = () => {
                           <span className={hasApiKey ? 'text-emerald-400' : 'text-rose-400'}> {hasApiKey ? 'AUTHENTICATED' : 'UNAUTHORIZED'}</span>
                        </p>
                        <p className="text-xs text-slate-300">
-                          <span className="text-indigo-400">VAR_SOURCE:</span> 
-                          <span> {process.env.API_KEY ? 'process.env.API_KEY' : 'Not Detected'}</span>
+                          <span className="text-indigo-400">KEY_SOURCE:</span> 
+                          <span> {process.env.API_KEY ? 'Vercel Env Detect' : 'Pending Deployment'}</span>
                        </p>
                     </div>
                  </div>
@@ -233,9 +233,9 @@ const AdminDashboard: React.FC = () => {
                  <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex gap-4">
                     <Info className="w-5 h-5 text-indigo-600 shrink-0 mt-1" />
                     <div>
-                      <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest mb-1">Server Setup Guide</p>
+                      <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest mb-1">Success Note</p>
                       <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                        The AI gateway automatically prioritizes the <code className="bg-slate-200 px-1 rounded">API_KEY</code> variable in your project's settings. Once you add the key and redeploy, the status above will automatically turn green.
+                        The AI engine is now listening to your <code className="bg-slate-200 px-1 rounded">API_KEY</code> from Vercel. You no longer need manual setup steps.
                       </p>
                     </div>
                  </div>
@@ -245,14 +245,14 @@ const AdminDashboard: React.FC = () => {
                  <button 
                    onClick={handleConnect}
                    disabled={isConnecting}
-                   className={`w-full py-6 rounded-[32px] font-black text-lg uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 ${hasApiKey ? 'bg-emerald-600 text-white shadow-emerald-100 hover:bg-emerald-700' : 'bg-markova text-white shadow-blue-100 hover:bg-blue-700'}`}
+                   className={`w-full py-6 rounded-[32px] font-black text-lg uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 ${hasApiKey ? 'bg-emerald-600 text-white shadow-emerald-100' : 'bg-markova text-white shadow-blue-100 hover:bg-blue-700'}`}
                  >
                     {isConnecting ? (
                        <Loader2 className="w-6 h-6 animate-spin" />
                     ) : (
                        hasApiKey ? <Check className="w-5 h-5" /> : <RefreshCw className="w-5 h-5" />
                     )}
-                    {hasApiKey ? 'System Online' : 'Refresh Gateway Status'}
+                    {hasApiKey ? 'Engine Online' : 'Check AI Status'}
                  </button>
                  <a 
                    href="https://ai.google.dev/gemini-api/docs/billing" 
@@ -260,7 +260,7 @@ const AdminDashboard: React.FC = () => {
                    rel="noopener noreferrer"
                    className="flex items-center justify-center gap-2 text-[10px] font-black text-slate-400 hover:text-markova uppercase tracking-[0.2em] transition-all"
                  >
-                    Manage API Billing <ExternalLink className="w-3 h-3" />
+                    Official Billing Portal <ExternalLink className="w-3 h-3" />
                  </a>
               </div>
            </div>

@@ -22,7 +22,7 @@ const VideoGeneratorPage: React.FC = () => {
   const [hasKey, setHasKey] = useState(false);
 
   const checkKey = useCallback(async () => {
-    // Priority: system environment
+    // Check for standard environment variable first (Vercel)
     if (process.env.API_KEY && process.env.API_KEY.length > 10) {
       setHasKey(true);
       return;
@@ -42,16 +42,15 @@ const VideoGeneratorPage: React.FC = () => {
   }, [checkKey]);
 
   const handleSelectKey = async () => {
+    await checkKey();
+    if (hasKey) return;
+
     const aiStudio = (window as any).aistudio;
     if (aiStudio && typeof aiStudio.openSelectKey === 'function') {
       await aiStudio.openSelectKey();
       setHasKey(true); 
     } else {
-      // If not in AI studio, re-verify env key
-      await checkKey();
-      if (!hasKey) {
-        alert("System Error: No API key found in your project settings. Please ensure API_KEY is set and the app is redeployed.");
-      }
+      alert("AI Architecture Restricted: No API key found in your environment. Please ensure API_KEY is set in your Vercel project settings.");
     }
   };
 

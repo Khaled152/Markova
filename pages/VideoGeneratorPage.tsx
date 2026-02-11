@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, useLanguage } from '../App';
 import { GoogleGenAI, VideoGenerationReferenceType } from "@google/genai";
-import { Video, Sparkles, Loader2, Download, AlertCircle, Key, Monitor, Smartphone, RefreshCw, X, Plus } from 'lucide-react';
+import { Video, Sparkles, Loader2, Download, AlertCircle, Key, Monitor, Smartphone, RefreshCw, X, Plus, Check } from 'lucide-react';
 
 const VideoGeneratorPage: React.FC = () => {
   const { user } = useAuth();
@@ -21,19 +21,25 @@ const VideoGeneratorPage: React.FC = () => {
   // Billing check for Veo 3.1
   const [hasKey, setHasKey] = useState(false);
 
-  useEffect(() => {
-    const checkKey = async () => {
-      const aiStudio = (window as any).aistudio;
-      if (aiStudio && typeof aiStudio.hasSelectedApiKey === 'function') {
-        const active = await aiStudio.hasSelectedApiKey();
-        setHasKey(active);
-      } else {
-        // Fallback check strictly on process.env
-        setHasKey(!!process.env.API_KEY);
-      }
-    };
-    checkKey();
+  const checkKey = useCallback(async () => {
+    // Priority: system environment
+    if (process.env.API_KEY && process.env.API_KEY.length > 10) {
+      setHasKey(true);
+      return;
+    }
+
+    const aiStudio = (window as any).aistudio;
+    if (aiStudio && typeof aiStudio.hasSelectedApiKey === 'function') {
+      const active = await aiStudio.hasSelectedApiKey();
+      setHasKey(active);
+    } else {
+      setHasKey(false);
+    }
   }, []);
+
+  useEffect(() => {
+    checkKey();
+  }, [checkKey]);
 
   const handleSelectKey = async () => {
     const aiStudio = (window as any).aistudio;
@@ -41,7 +47,11 @@ const VideoGeneratorPage: React.FC = () => {
       await aiStudio.openSelectKey();
       setHasKey(true); 
     } else {
-      alert("Billing selection is only available in the official AI Studio environment.");
+      // If not in AI studio, re-verify env key
+      await checkKey();
+      if (!hasKey) {
+        alert("System Error: No API key found in your project settings. Please ensure API_KEY is set and the app is redeployed.");
+      }
     }
   };
 
@@ -71,8 +81,9 @@ const VideoGeneratorPage: React.FC = () => {
     setStatus('Initializing Veo 3.1 Node...');
 
     try {
-      // Use process.env.API_KEY directly as per guidelines
       const apiKey = process.env.API_KEY || '';
+      if (!apiKey) throw new Error("Missing credentials. Please check project environment variables.");
+
       const ai = new GoogleGenAI({ apiKey });
       
       let model = 'veo-3.1-fast-generate-preview';
@@ -147,7 +158,7 @@ const VideoGeneratorPage: React.FC = () => {
         } catch (e: any) {
           if (e.message?.includes("Requested entity was not found")) {
             setHasKey(false);
-            throw new Error("API Key configuration reset required. Please re-select your billing key.");
+            throw new Error("Authentication failure. The API key might be invalid or restricted.");
           }
           throw e;
         }
@@ -163,7 +174,7 @@ const VideoGeneratorPage: React.FC = () => {
       setVideoUrl(url);
     } catch (err: any) {
       console.error("Veo 3.1 Generation Error:", err);
-      setError(err.message || "Failed to generate video. Please ensure your prompt and images are valid.");
+      setError(err.message || "Failed to generate video. Please ensure your project environment is correctly configured.");
     } finally {
       setIsLoading(false);
       setStatus('');
@@ -183,14 +194,15 @@ const VideoGeneratorPage: React.FC = () => {
           <p className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">Nano Banana Veo 3.1 Cinematic Workspace</p>
         </div>
         
-        {!hasKey && (
-          <button 
-            onClick={handleSelectKey}
-            className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-600 transition-all shadow-lg shadow-amber-100"
-          >
-            <Key className="w-4 h-4" /> Link Billing Account
-          </button>
-        )}
+        <div className={`flex items-center gap-3 px-5 py-2.5 rounded-xl border ${hasKey ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+           <div className={`w-2 h-2 rounded-full ${hasKey ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+           <span className="text-[10px] font-black uppercase tracking-widest">{hasKey ? 'Gateway Authenticated' : 'Gateway Disconnected'}</span>
+           {!hasKey && (
+             <button onClick={handleSelectKey} className="ml-3 p-1.5 bg-markova text-white rounded-lg hover:bg-blue-700">
+                <RefreshCw className="w-3.5 h-3.5" />
+             </button>
+           )}
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-10 items-start">

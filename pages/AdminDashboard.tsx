@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLanguage } from '../App';
 import { mockDb } from '../services/mockDb';
 import { User, Plan, UserRole, ActivityLog } from '../types';
 import { 
   ShieldCheck, Users, CreditCard, Activity, 
   Loader2, Trash2, Plus, X, Check, AlertCircle, Search, 
-  Settings, Bell, Database, Globe, Power, Info, Key, ExternalLink, RefreshCw, Cpu, Server, Terminal
+  Settings, Bell, Database, Globe, Power, Info, Key, ExternalLink, RefreshCw, Cpu, Server, Terminal, Zap
 } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
@@ -18,7 +18,7 @@ const AdminDashboard: React.FC = () => {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // API Key state purely based on system availability
+  // AI Connection State
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
   const [checkingKey, setCheckingKey] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -31,17 +31,18 @@ const AdminDashboard: React.FC = () => {
     alert_msg: 'Markova 3.5 Core Engine Upgrade in progress.'
   });
 
-  const checkApiKeyStatus = async () => {
+  const checkApiKeyStatus = useCallback(async () => {
     setCheckingKey(true);
-    setError(null);
     try {
-      // First check if it's already in the process environment (server-side/injected)
-      if (process.env.API_KEY && process.env.API_KEY.length > 5) {
+      // Priority 1: Check system-level environment variable (Standard for Vercel/Self-hosted)
+      const envKey = process.env.API_KEY;
+      if (envKey && envKey.length > 10) {
         setHasApiKey(true);
+        setError(null);
         return;
       }
 
-      // Then check for platform-specific selection tool
+      // Priority 2: Check for AI Studio platform selection (Standard for preview/iframe)
       const aiStudio = (window as any).aistudio;
       if (aiStudio && typeof aiStudio.hasSelectedApiKey === 'function') {
         const active = await aiStudio.hasSelectedApiKey();
@@ -55,21 +56,27 @@ const AdminDashboard: React.FC = () => {
     } finally {
       setCheckingKey(false);
     }
-  };
+  }, []);
 
   const handleConnect = async () => {
     setIsConnecting(true);
     setError(null);
     try {
+      // Re-run the environment check first
+      await checkApiKeyStatus();
+      
+      if (hasApiKey) {
+        alert("System Synchronized: The AI Gateway is active via your server environment variables.");
+        return;
+      }
+
+      // If still no key, try the selection dialog
       const aiStudio = (window as any).aistudio;
       if (aiStudio && typeof aiStudio.openSelectKey === 'function') {
         await aiStudio.openSelectKey();
-        // The key selection might take a moment to reflect, but we proceed
         setHasApiKey(true);
-        alert("Success: AI Gateway linked via secure platform selector.");
       } else {
-        // In a standalone server environment, explain why manual input isn't here
-        setError("Secure Key Selector Unavailable. In production environments, please ensure your API_KEY is set in your server's environment variables (process.env.API_KEY).");
+        setError("AI Gateway could not be initialized. Please ensure the API_KEY environment variable is correctly set in your project settings and you have redeployed the application.");
       }
     } catch (e: any) {
       setError(e.message || "An unexpected error occurred during gateway activation.");
@@ -99,12 +106,12 @@ const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchAllData();
-  }, []);
+  }, [checkApiKeyStatus]);
 
   const stats = useMemo(() => [
     { label: 'System Identities', value: users.length, icon: <Users />, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Active Sessions', value: users.filter(u => u.subscription_status === 'active').length, icon: <Activity />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'API Throughput', value: hasApiKey ? 'Optimal' : 'Offline', icon: <Cpu />, color: hasApiKey ? 'text-indigo-600' : 'text-rose-600', bg: hasApiKey ? 'bg-indigo-50' : 'bg-rose-50' },
+    { label: 'AI Throughput', value: hasApiKey ? 'Optimal' : 'Offline', icon: <Cpu />, color: hasApiKey ? 'text-indigo-600' : 'text-rose-600', bg: hasApiKey ? 'bg-indigo-50' : 'bg-rose-50' },
   ], [users, hasApiKey]);
 
   if (loading) {
@@ -189,7 +196,7 @@ const AdminDashboard: React.FC = () => {
                     <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
                  ) : (
                     <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${hasApiKey ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                       {hasApiKey ? 'Active Connection' : 'Disconnected'}
+                       {hasApiKey ? 'System Ready' : 'Disconnected'}
                     </div>
                  )}
               </div>
@@ -198,7 +205,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="p-6 bg-red-50 border border-red-100 rounded-[24px] flex flex-col gap-2 text-red-700 text-xs animate-in shake duration-300">
                   <div className="flex items-center gap-2 font-black uppercase tracking-widest">
                     <AlertCircle className="w-4 h-4 shrink-0" />
-                    Engine Activation Failed
+                    Gateway Configuration Required
                   </div>
                   <p className="font-medium opacity-80 leading-relaxed">{error}</p>
                 </div>
@@ -212,17 +219,23 @@ const AdminDashboard: React.FC = () => {
                     </div>
                     <div className="space-y-2">
                        <p className="text-xs text-slate-300"><span className="text-indigo-400">ENGINE:</span> Gemini 3.0 Pro & Veo 3.1</p>
-                       <p className="text-xs text-slate-300"><span className="text-indigo-400">STATUS:</span> {hasApiKey ? 'AUTHENTICATED' : 'UNAUTHORIZED'}</p>
-                       <p className="text-xs text-slate-300"><span className="text-indigo-400">ENV_VAR:</span> {process.env.API_KEY ? 'INJECTED_SYSTEM' : 'PENDING_INPUT'}</p>
+                       <p className="text-xs text-slate-300">
+                          <span className="text-indigo-400">STATUS:</span> 
+                          <span className={hasApiKey ? 'text-emerald-400' : 'text-rose-400'}> {hasApiKey ? 'AUTHENTICATED' : 'UNAUTHORIZED'}</span>
+                       </p>
+                       <p className="text-xs text-slate-300">
+                          <span className="text-indigo-400">VAR_SOURCE:</span> 
+                          <span> {process.env.API_KEY ? 'process.env.API_KEY' : 'Not Detected'}</span>
+                       </p>
                     </div>
                  </div>
 
                  <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex gap-4">
                     <Info className="w-5 h-5 text-indigo-600 shrink-0 mt-1" />
                     <div>
-                      <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest mb-1">Configuration Note</p>
+                      <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest mb-1">Server Setup Guide</p>
                       <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                        To maintain production-grade security, manual text input for keys is disabled. Keys must be set via your server's <code className="bg-slate-200 px-1 rounded">API_KEY</code> environment variable or the secure platform dialog.
+                        The AI gateway automatically prioritizes the <code className="bg-slate-200 px-1 rounded">API_KEY</code> variable in your project's settings. Once you add the key and redeploy, the status above will automatically turn green.
                       </p>
                     </div>
                  </div>
@@ -232,14 +245,14 @@ const AdminDashboard: React.FC = () => {
                  <button 
                    onClick={handleConnect}
                    disabled={isConnecting}
-                   className="w-full bg-markova text-white py-6 rounded-[32px] font-black text-lg uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 flex items-center justify-center gap-3 disabled:bg-slate-200 disabled:text-slate-400"
+                   className={`w-full py-6 rounded-[32px] font-black text-lg uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 ${hasApiKey ? 'bg-emerald-600 text-white shadow-emerald-100 hover:bg-emerald-700' : 'bg-markova text-white shadow-blue-100 hover:bg-blue-700'}`}
                  >
                     {isConnecting ? (
                        <Loader2 className="w-6 h-6 animate-spin" />
                     ) : (
-                       <Power className="w-5 h-5" />
+                       hasApiKey ? <Check className="w-5 h-5" /> : <RefreshCw className="w-5 h-5" />
                     )}
-                    {hasApiKey ? 'Refresh AI Engine' : 'Activate AI Gateway'}
+                    {hasApiKey ? 'System Online' : 'Refresh Gateway Status'}
                  </button>
                  <a 
                    href="https://ai.google.dev/gemini-api/docs/billing" 
@@ -247,7 +260,7 @@ const AdminDashboard: React.FC = () => {
                    rel="noopener noreferrer"
                    className="flex items-center justify-center gap-2 text-[10px] font-black text-slate-400 hover:text-markova uppercase tracking-[0.2em] transition-all"
                  >
-                    Official Billing Documentation <ExternalLink className="w-3 h-3" />
+                    Manage API Billing <ExternalLink className="w-3 h-3" />
                  </a>
               </div>
            </div>

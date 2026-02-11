@@ -50,7 +50,7 @@ interface ErrorBoundaryState {
 }
 
 // Global Error Boundary to prevent total White Screens
-// Explicitly using React.Component ensures correct property inference for state and props
+// Fix: Extending React.Component directly to resolve TypeScript errors where 'props' property might not be inferred from the named import 'Component'
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   // Use property initializer for state to ensure it is defined on the instance
   state: ErrorBoundaryState = { hasError: false };
@@ -76,7 +76,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         </div>
       );
     }
-    // Access children from this.props
+    // Correctly access children from this.props which is inherited from React.Component
     return this.props.children;
   }
 }

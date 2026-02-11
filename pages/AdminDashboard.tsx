@@ -132,7 +132,9 @@ const AdminDashboard: React.FC = () => {
 
               <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex gap-4">
                 <Info className="w-5 h-5 text-indigo-600 shrink-0 mt-1" />
-                <p className="text-[10px] text-slate-500 font-medium leading-relaxed">Infrastructure key is handled exclusively on the server. To update, go to Vercel Settings -> Environment Variables and redeploy.</p>
+                <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                  Infrastructure key is handled exclusively on the server. To update, go to Vercel Settings {"->"} Environment Variables and redeploy.
+                </p>
               </div>
 
               <button onClick={checkApiKeyStatus} className="w-full py-6 rounded-[32px] bg-slate-900 text-white font-black text-lg uppercase tracking-widest shadow-xl flex items-center justify-center gap-3">

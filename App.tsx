@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, createContext, useContext, Component, ReactNode } from 'react';
+import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import { User, UserRole, LanguageContextType } from './types';
 import { DICTIONARY } from './constants';
@@ -50,12 +50,10 @@ interface ErrorBoundaryState {
 }
 
 // Global Error Boundary to prevent total White Screens
-// Fix: Use React.Component explicitly to resolve TypeScript inference issues with 'props' and 'children'
+// Fix: Use React.Component to ensure props and state are correctly typed and accessible
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false };
-  }
+  // Use property initializer for state to ensure better type inference for this.state
+  state: ErrorBoundaryState = { hasError: false };
 
   // Handle potential errors by updating state
   static getDerivedStateFromError(_error: Error): ErrorBoundaryState { 

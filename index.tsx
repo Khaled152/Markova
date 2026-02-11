@@ -1,16 +1,6 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-
-// Global shim for process.env to prevent ReferenceErrors in raw browser ESM
-if (typeof (window as any).process === 'undefined') {
-  (window as any).process = { 
-    env: { 
-      API_KEY: '' // This will be handled by the environment or the user dialog
-    } 
-  };
-}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

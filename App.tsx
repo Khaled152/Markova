@@ -1,4 +1,5 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+
+import React, { useState, useEffect, createContext, useContext, Component, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import { User, UserRole, LanguageContextType } from './types';
 import { DICTIONARY } from './constants';
@@ -13,10 +14,11 @@ import StrategicPlanPage from './pages/StrategicPlanPage';
 import CampaignHistoryPage from './pages/CampaignHistoryPage';
 import CampaignDetailsPage from './pages/CampaignDetailsPage';
 import ImageGeneratorPage from './pages/ImageGeneratorPage';
+import VideoGeneratorPage from './pages/VideoGeneratorPage';
 import SinglePostPage from './pages/SinglePostPage';
 import AdminDashboard from './pages/AdminDashboard';
 import Login from './pages/Login';
-import { LogOut, User as UserIcon, Settings, LayoutDashboard, Sparkles, FolderHeart, ShieldCheck, Globe, ImageIcon, Loader2, Compass, AlertCircle } from 'lucide-react';
+import { LogOut, User as UserIcon, Settings, LayoutDashboard, Sparkles, FolderHeart, ShieldCheck, Globe, ImageIcon, Loader2, Compass, AlertCircle, Video } from 'lucide-react';
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
@@ -38,15 +40,32 @@ export const useAuth = () => {
   return context;
 };
 
+// Define explicit interfaces for ErrorBoundary props and state
+interface ErrorBoundaryProps {
+  children?: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
 // Global Error Boundary to prevent total White Screens
-// Fix: Added explicit typing for React.Component and made children optional to satisfy JSX prop requirements
-class ErrorBoundary extends React.Component<{ children?: React.ReactNode }, { hasError: boolean }> {
-  constructor(props: { children?: React.ReactNode }) {
+// Explicitly using React.Component ensures correct property inference for state and props
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Use property initializer for state to ensure it is defined on the instance
+  state: ErrorBoundaryState = { hasError: false };
+
+  constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false };
   }
-  static getDerivedStateFromError() { return { hasError: true }; }
+
+  // Handle potential errors by updating state
+  static getDerivedStateFromError(_error: Error): ErrorBoundaryState { 
+    return { hasError: true }; 
+  }
+
   render() {
+    // Access state directly from this.state
     if (this.state.hasError) {
       return (
         <div className="h-screen flex flex-col items-center justify-center p-10 bg-slate-50 text-center">
@@ -57,6 +76,7 @@ class ErrorBoundary extends React.Component<{ children?: React.ReactNode }, { ha
         </div>
       );
     }
+    // Access children from this.props
     return this.props.children;
   }
 }
@@ -138,6 +158,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <Link to="/image-gen" className="flex items-center gap-3 px-4 py-3 text-slate-600 font-bold hover:bg-slate-50 hover:text-indigo-600 rounded-xl transition-all">
             <ImageIcon className="w-5 h-5" />
             Studio
+          </Link>
+          <Link to="/video-gen" className="flex items-center gap-3 px-4 py-3 text-slate-600 font-bold hover:bg-slate-50 hover:text-indigo-600 rounded-xl transition-all">
+            <Video className="w-5 h-5" />
+            Reels
           </Link>
           <Link to="/history" className="flex items-center gap-3 px-4 py-3 text-slate-600 font-bold hover:bg-slate-50 hover:text-indigo-600 rounded-xl transition-all">
             <Settings className="w-5 h-5" />
@@ -265,6 +289,7 @@ const App: React.FC = () => {
                 <Route path="/generator" element={user ? <CampaignGeneratorPage /> : <Navigate to="/login" />} />
                 <Route path="/strategy" element={user ? <StrategicPlanPage /> : <Navigate to="/login" />} />
                 <Route path="/image-gen" element={user ? <ImageGeneratorPage /> : <Navigate to="/login" />} />
+                <Route path="/video-gen" element={user ? <VideoGeneratorPage /> : <Navigate to="/login" />} />
                 <Route path="/history" element={user ? <CampaignHistoryPage /> : <Navigate to="/login" />} />
                 <Route path="/campaign/:id" element={user ? <CampaignDetailsPage /> : <Navigate to="/login" />} />
                 <Route path="/post/:campaignId/:postId" element={user ? <SinglePostPage /> : <Navigate to="/login" />} />

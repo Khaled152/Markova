@@ -6,7 +6,7 @@ import { User, Plan, UserRole, ActivityLog } from '../types';
 import { 
   ShieldCheck, Users, CreditCard, Activity, Edit3, Lock, Unlock, 
   MoreVertical, Loader2, Trash2, Plus, X, Check, AlertCircle, Search, 
-  Ban, Settings, Bell, Database, Globe, Filter, Power, Info
+  Ban, Settings, Bell, Database, Globe, Filter, Power, Info, Key, ExternalLink, RefreshCw
 } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
@@ -19,6 +19,10 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // API Key Status state
+  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
+  const [checkingKey, setCheckingKey] = useState(false);
 
   // Modals state
   const [showUserModal, setShowUserModal] = useState(false);
@@ -33,6 +37,30 @@ const AdminDashboard: React.FC = () => {
     alert_msg: 'Markova 3.1 infrastructure upgrade in progress.'
   });
 
+  const checkApiKeyStatus = async () => {
+    setCheckingKey(true);
+    try {
+      // @ts-ignore - window.aistudio is provided by the platform
+      const active = await window.aistudio.hasSelectedApiKey();
+      setHasApiKey(active);
+    } catch (e) {
+      console.error("API Key Check Failed", e);
+    } finally {
+      setCheckingKey(false);
+    }
+  };
+
+  const handleUpdateApiKey = async () => {
+    try {
+      // @ts-ignore - window.aistudio is provided by the platform
+      await window.aistudio.openSelectKey();
+      // Assume success and refresh status
+      checkApiKeyStatus();
+    } catch (e) {
+      console.error("Failed to open key selector", e);
+    }
+  };
+
   const fetchAllData = async () => {
     setLoading(true);
     try {
@@ -44,6 +72,7 @@ const AdminDashboard: React.FC = () => {
       setUsers(u || []);
       setPlans(p || []);
       setLogs(l || []);
+      await checkApiKeyStatus();
     } catch (err) {
       console.error("Admin Fetch Error:", err);
     } finally {
@@ -377,6 +406,51 @@ const AdminDashboard: React.FC = () => {
       {/* Infrastructure Tab */}
       {activeTab === 'system' && (
         <div className="grid lg:grid-cols-2 gap-10">
+           {/* Gemini API Credentials Card */}
+           <div className="bg-white rounded-[48px] p-12 border border-slate-100 shadow-sm space-y-10 flex flex-col">
+              <div className="flex items-center justify-between mb-2">
+                 <div className="flex items-center gap-4">
+                    <Key className="w-6 h-6 text-markova" />
+                    <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight">Gemini Cloud Credentials</h4>
+                 </div>
+                 {checkingKey ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
+                 ) : (
+                    <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${hasApiKey ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                       {hasApiKey ? 'Active Connection' : 'Disconnected'}
+                    </div>
+                 )}
+              </div>
+
+              <div className="bg-slate-50 p-8 rounded-[32px] border border-slate-100 space-y-4">
+                 <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                    Link your paid Google Cloud project to enable high-quality visual synthesis, strategic reasoning, and cinematic video generation across the entire Markova instance.
+                 </p>
+                 <div className="flex items-center gap-2 text-[10px] font-black text-markova uppercase tracking-widest">
+                    <Info className="w-4 h-4" />
+                    Enterprise-Grade Encryption Applied
+                 </div>
+              </div>
+
+              <div className="space-y-4">
+                 <button 
+                   onClick={handleUpdateApiKey}
+                   className="w-full bg-markova text-white py-6 rounded-[32px] font-black text-lg uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 flex items-center justify-center gap-3"
+                 >
+                    <RefreshCw className="w-5 h-5" />
+                    {hasApiKey ? 'Update API Identity' : 'Link Google Cloud Key'}
+                 </button>
+                 <a 
+                   href="https://ai.google.dev/gemini-api/docs/billing" 
+                   target="_blank" 
+                   rel="noopener noreferrer"
+                   className="flex items-center justify-center gap-2 text-[10px] font-black text-slate-400 hover:text-markova uppercase tracking-[0.2em] transition-all"
+                 >
+                    Billing Documentation <ExternalLink className="w-3 h-3" />
+                 </a>
+              </div>
+           </div>
+
            <div className="bg-white rounded-[48px] p-12 border border-slate-100 shadow-sm space-y-10">
               <div className="flex items-center gap-4 mb-6">
                  <Power className="w-6 h-6 text-markova" />
@@ -421,47 +495,6 @@ const AdminDashboard: React.FC = () => {
                        />
                     </div>
                  </div>
-              </div>
-              <button className="w-full bg-slate-900 text-white py-6 rounded-[32px] font-black text-[12px] uppercase tracking-[0.2em] hover:bg-slate-800 transition-all shadow-xl">
-                 Propagate System Updates
-              </button>
-           </div>
-
-           <div className="bg-slate-900 rounded-[48px] p-12 text-white space-y-10 shadow-2xl">
-              <div className="flex items-center gap-4 mb-6">
-                 <Globe className="w-6 h-6 text-markova" />
-                 <h4 className="text-xl font-black uppercase tracking-tight">Infrastructure Health</h4>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-6">
-                 {[
-                    { label: 'Supabase Cloud', status: 'Optimal', color: 'text-emerald-400' },
-                    { label: 'Nano Banana Engine', status: 'Scaling', color: 'text-blue-400' },
-                    { label: 'CDN Edge', status: 'Synced', color: 'text-emerald-400' },
-                    { label: 'Auth Gateway', status: 'Encrypted', color: 'text-indigo-400' },
-                 ].map((h, i) => (
-                    <div key={i} className="p-6 bg-white/5 border border-white/10 rounded-3xl space-y-2">
-                       <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{h.label}</p>
-                       <p className={`text-sm font-black uppercase tracking-tight ${h.color}`}>{h.status}</p>
-                    </div>
-                 ))}
-              </div>
-
-              <div className="p-8 bg-white/5 border border-white/10 rounded-[32px] space-y-4">
-                 <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
-                    <span className="text-slate-500">Global Cluster Load</span>
-                    <span className="text-markova">12%</span>
-                 </div>
-                 <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-markova w-[12%] transition-all duration-1000" />
-                 </div>
-              </div>
-
-              <div className="bg-blue-600/10 border border-blue-500/20 p-8 rounded-[32px] flex gap-5">
-                 <Info className="w-6 h-6 text-markova shrink-0" />
-                 <p className="text-xs text-blue-200 leading-relaxed font-medium">
-                    The Markova architecture is currently running in "Secure Environment" mode. Gemini API keys are injected via protected environment variables and cannot be modified via this interface for infrastructure security.
-                 </p>
               </div>
            </div>
         </div>
